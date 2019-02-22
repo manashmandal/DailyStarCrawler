@@ -3,9 +3,10 @@ from pymongo import MongoClient
 import datetime
 import logging
 from scrapy.exceptions import CloseSpider
-from string import punctuation, digits
+from string import punctuation
+from pprint import pprint
 
-punct_remover = str.maketrans('', '', punctuation + digits)
+punct_remover = str.maketrans('', '', punctuation )
 
 FILTER_KEYWORDS="""fire
 blast
@@ -14,10 +15,7 @@ burn
 burns
 explosion
 inferno
-blaze
-fire""".split('\n')
-
-logging.info(FILTER_KEYWORDS)
+blaze""".split('\n')
 
 
 # Get the collection
@@ -27,7 +25,7 @@ class DailyStarSpider(scrapy.Spider):
     name='ds'
 
     # First date - 01-09-2007
-    def start_requests(self, start_date="22-02-2019", end_date="22-02-2019"):
+    def start_requests(self, start_date="01-09-2007", end_date="22-02-2019"):
         self.baseurl = "https://www.thedailystar.net"
         self.start_url = f"https://www.thedailystar.net/newspaper?date={start_date}"
 
@@ -43,7 +41,7 @@ class DailyStarSpider(scrapy.Spider):
             self.end_date = datetime.datetime.strptime(end_date, "%d-%m-%Y")
 
         # Selectors
-        self.GRAB_ALL_NEWS_LINKS = "//h5/a/@href//text()/../@href" # extract()
+        self.GRAB_ALL_NEWS_LINKS = "//h5/a//text()/../@href" # extract()
         self.GRAB_ALL_NEWS_TITLE = "//h5/a//text()" # extract()
         self.GRAB_NEWS_BODY = "//div[contains(@class,'field-body')]//p/text()" # extract()
         self.GRAB_REPORTER = "//span[@itemprop='name']/text()" # extract()
@@ -59,26 +57,26 @@ class DailyStarSpider(scrapy.Spider):
         news_links_on_this_page = response.xpath(self.GRAB_ALL_NEWS_LINKS).extract()
         news_title_on_this_page = response.xpath(self.GRAB_ALL_NEWS_TITLE).extract()
 
-        # assert len(news_links_on_this_page) == len(news_title_on_this_page)
-
         for idx, link in enumerate(news_links_on_this_page):
             
             # Remove punctuations after getting the title
             title = news_title_on_this_page[idx].lower().translate(punct_remover)
 
-            logging.info("TITLE " + title)
-
-            scrap_it = False
+            # scrap_it = False
             # If condition matches then yield result 
-            for keyword in FILTER_KEYWORDS:
-                logging.info(title)
-                if keyword in title:
-                    scrap_it = True
-            
-            if scrap_it:
+            if any([keyword in title for keyword in FILTER_KEYWORDS]):
                 request = scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
                 request.meta['date_published'] = self.current_date
                 yield request
+                # logging.info("TRUE {}".format(title))
+            # for keyword in FILTER_KEYWORDS:
+            #     if keyword in title:
+            #         scrap_it = True
+            
+            # if scrap_it:
+                # request = scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
+                # request.meta['date_published'] = self.current_date
+                # yield request
 
         self.current_date = self.current_date + datetime.timedelta(days=1)
 
