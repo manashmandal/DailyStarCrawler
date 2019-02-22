@@ -31,7 +31,7 @@ class DailyStarSpider(scrapy.Spider):
         self.GRAB_NEWS_BODY = "//div[contains(@class,'field-body')]//p/text()" # extract()
         self.GRAB_REPORTER = "//span[@itemprop='name']/text()" # extract()
         self.GRAB_REPORTERS = "//span[@itemprop='name']/a/text()" # extract()
-        self.GRAB_BREADCRUMB = "//div[@class='breadcrumb']"
+        self.GRAB_BREADCRUMB = "//div[@class='breadcrumb']//span[@itemprop='name']/text()"
         self.GRAB_TITLE = "//h1[@itemprop='headline']//text()"
 
         yield scrapy.Request(url=self.start_url, callback=self.news_iterator)
@@ -60,6 +60,7 @@ class DailyStarSpider(scrapy.Spider):
         body_text = " ".join(text.strip() for text in response.xpath(self.GRAB_NEWS_BODY).extract())
         reporter = response.xpath(self.GRAB_REPORTER).extract()
         title = response.xpath(self.GRAB_TITLE).extract_first() or ""
+        breadcrumb = response.xpath(self.GRAB_BREADCRUMB).extract()
 
         # if first grabber fails try using the next one
         if reporter == []:
@@ -67,6 +68,7 @@ class DailyStarSpider(scrapy.Spider):
 
         data = dict(
             title=title,
+            breadcrumb=breadcrumb,
             date_published=date_published,
             news_body=body_text,
             reporter=reporter,
