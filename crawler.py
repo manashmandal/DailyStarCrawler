@@ -29,8 +29,8 @@ blaze""".split('\n')
 
 news = MongoClient(connect=False)['dailystar']['news']
 
-sd = "01-09-2007"
-ed = "31-12-2007"
+sd = "01-01-2014"
+ed = "31-12-2014"
 DATE_FORMATTER = "%d-%m-%Y"
 
 start_date = datetime.datetime.strptime(sd, DATE_FORMATTER)
