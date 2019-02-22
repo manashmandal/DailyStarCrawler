@@ -62,10 +62,7 @@ class DailyStarSpider(scrapy.Spider):
             # Remove punctuations after getting the title
             title = title.lower().translate(punct_remover)
 
-            # scrap_it = False
-            # If condition matches then yield result 
             if any([keyword in title for keyword in FILTER_KEYWORDS]):
-                logging.info("{} - {}".format(title, self.baseurl + link))
                 request = scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
                 request.meta['date_published'] = self.current_date
                 yield request
