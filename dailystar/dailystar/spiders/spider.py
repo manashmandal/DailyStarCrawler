@@ -3,14 +3,19 @@ from pymongo import MongoClient
 import datetime
 import logging
 
+# Get the collection
+news = MongoClient(connect=False)['dailystar']['news']
+
 class DailyStarSpider(scrapy.Spider):
     name='ds'
 
+    # First date - 01-09-2007
     def start_requests(self, start_date="01-09-2007", end_date=None):
         self.baseurl = "https://www.thedailystar.net"
         self.start_url = f"https://www.thedailystar.net/newspaper?date={start_date}"
 
         self.start_date = datetime.datetime.strptime(start_date, "%d-%M-%Y")
+        self.current_date = self.start_date
         
         if end_date is None:
             self.end_date = self.start_date + datetime.timedelta(days=1)
@@ -20,6 +25,11 @@ class DailyStarSpider(scrapy.Spider):
 
         # Selectors
         self.GRAB_ALL_NEWS_LINKS = "//h5/a/@href" # extract()
+        self.GRAB_NEWS_BODY = "//div[contains(@class,'field-body')]//p/text()" # extract()
+        self.GRAB_REPORTER = "//span[@itemprop='name']/text()" # extract()
+        self.GRAB_REPORTERS = "//span[@itemprop='name']/a/text()" # extract()
+        self.GRAB_BREADCRUMB = "//div[@class='breadcrumb']"
+        self.GRAB_TITLE = "//h1[@itemprop='headline']//text()"
 
         yield scrapy.Request(url=self.start_url, callback=self.news_iterator)
 
@@ -28,9 +38,30 @@ class DailyStarSpider(scrapy.Spider):
         news_links_on_this_page = response.xpath(self.GRAB_ALL_NEWS_LINKS).extract()
 
         for link in news_links_on_this_page:
-            yield scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
-
-        
+            request = scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
+            request.meta['date_published'] = self.current_date
+            yield request
 
     def news_parser(self, response):
-        logging.info(response.url)
+        date_published = response.meta['date_published']
+        permalink = response.url
+        body_text = " ".join(text.strip() for text in response.xpath(self.GRAB_NEWS_BODY).extract())
+        reporter = response.xpath(self.GRAB_REPORTER).extract()
+        title = response.xpath(self.GRAB_TITLE).extract_first() or ""
+
+        # if first grabber fails try using the next one
+        if reporter == []:
+            reporter = response.xpath(self.GRAB_REPORTERS).extract()
+
+        data = dict(
+            title=title,
+            date_published=date_published,
+            news_body=body_text,
+            reporter=reporter,
+            permalink=permalink
+        )
+
+        news.update_one({ 'permalink' : permalink }, {"$set" : data } , upsert=True)
+
+
+        
