@@ -57,26 +57,18 @@ class DailyStarSpider(scrapy.Spider):
         news_links_on_this_page = response.xpath(self.GRAB_ALL_NEWS_LINKS).extract()
         news_title_on_this_page = response.xpath(self.GRAB_ALL_NEWS_TITLE).extract()
 
-        for idx, link in enumerate(news_links_on_this_page):
+        for link, title in zip(news_links_on_this_page, news_title_on_this_page):
             
             # Remove punctuations after getting the title
-            title = news_title_on_this_page[idx].lower().translate(punct_remover)
+            title = title.lower().translate(punct_remover)
 
             # scrap_it = False
             # If condition matches then yield result 
             if any([keyword in title for keyword in FILTER_KEYWORDS]):
+                logging.info("{} - {}".format(title, self.baseurl + link))
                 request = scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
                 request.meta['date_published'] = self.current_date
                 yield request
-                # logging.info("TRUE {}".format(title))
-            # for keyword in FILTER_KEYWORDS:
-            #     if keyword in title:
-            #         scrap_it = True
-            
-            # if scrap_it:
-                # request = scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
-                # request.meta['date_published'] = self.current_date
-                # yield request
 
         self.current_date = self.current_date + datetime.timedelta(days=1)
 
@@ -108,7 +100,10 @@ class DailyStarSpider(scrapy.Spider):
             permalink=permalink
         )
 
-        news.update_one({ 'permalink' : permalink }, {"$set" : data } , upsert=True)
+        title = title.lower().translate(punct_remover)
+
+        if any([keyword in title for keyword in FILTER_KEYWORDS]):
+            news.update_one({ 'permalink' : permalink }, {"$set" : data } , upsert=True)
 
 
         
