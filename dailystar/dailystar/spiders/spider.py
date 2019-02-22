@@ -2,6 +2,7 @@ import scrapy
 from pymongo import MongoClient
 import datetime
 import logging
+from scrapy.exceptions import CloseSpider
 
 # Get the collection
 news = MongoClient(connect=False)['dailystar']['news']
@@ -14,14 +15,16 @@ class DailyStarSpider(scrapy.Spider):
         self.baseurl = "https://www.thedailystar.net"
         self.start_url = f"https://www.thedailystar.net/newspaper?date={start_date}"
 
-        self.start_date = datetime.datetime.strptime(start_date, "%d-%M-%Y")
+        self.start_date = datetime.datetime.strptime(start_date, "%d-%m-%Y")
         self.current_date = self.start_date
+
+        self.date_margin = 10
         
         if end_date is None:
             self.end_date = self.start_date + datetime.timedelta(days=1)
             
         else:
-            self.end_date = datetime.datetime.strptime(end_date, "%d-%M-%Y")
+            self.end_date = datetime.datetime.strptime(end_date, "%d-%m-%Y")
 
         # Selectors
         self.GRAB_ALL_NEWS_LINKS = "//h5/a/@href" # extract()
@@ -41,6 +44,15 @@ class DailyStarSpider(scrapy.Spider):
             request = scrapy.Request(url=self.baseurl + link, callback=self.news_parser)
             request.meta['date_published'] = self.current_date
             yield request
+
+        self.current_date = self.current_date + datetime.timedelta(days=1)
+
+        if self.current_date > ( self.end_date + datetime.timedelta(days=self.date_margin) ):
+            raise CloseSpider("Current date - {} - end Date - {}".format(
+                self.current_date.strftime("%d-%m-%Y"), self.end_date.strftime("%d-%m-%Y")
+            ))
+
+        yield scrapy.Request(self.baseurl + '/newspaper?date=' + self.current_date.strftime("%d-%m-%Y"), callback=self.news_iterator)
 
     def news_parser(self, response):
         date_published = response.meta['date_published']
